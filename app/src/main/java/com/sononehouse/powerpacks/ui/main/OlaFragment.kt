@@ -31,7 +31,7 @@ class OlaFragment : Fragment() {
 
     private lateinit var pageViewModel: OlaPageViewModel
     private lateinit var coordinateET: EditText;
-    private lateinit var urlET: EditText;
+    private lateinit var urlET: TextView;
     private lateinit var pastButton: Button;
 
     var client = OkHttpClient().newBuilder()
@@ -84,8 +84,12 @@ class OlaFragment : Fragment() {
         pastButton = root.findViewById(R.id.paste)
         pastButton.setOnClickListener {
 
+            doStart()
+
             val clipValue = getClipboard()
             if (! clipValue.isNullOrEmpty()) {
+                Log.d("``OlaFragment", "clipboard value: $clipValue")
+
                 val r = Regex("""https[\S]+""")
                 val m = r.find(clipValue)
                 if (m != null && ! m.groups.isEmpty()) {
@@ -93,8 +97,10 @@ class OlaFragment : Fragment() {
                     Log.d("``OlaFragment", "extracted url from clipboard: $url")
 
                     viewModel.setUrl(url)
+                    return@setOnClickListener
                 }
             }
+            doFail("No link found")
         }
         urlET = root.findViewById(R.id.url)
 
@@ -242,7 +248,7 @@ class OlaFragment : Fragment() {
                 doSuccess(latLong)
             }
             else {
-                showSmallToast("Can't extract location coordinates")
+                doFail("Can't extract location coordinates")
             }
         }
         else if (httpStatusCode >= 301 && httpStatusCode <= 302) {
@@ -254,7 +260,7 @@ class OlaFragment : Fragment() {
                     if (latLong != null) {
                         doSuccess(latLong)
                     } else {
-                        showSmallToast("Can't extract location coordinates")
+                        doFail("Can't extract location coordinates")
                     }
                 }
                 else if (location.contains("/place")){
@@ -272,7 +278,7 @@ class OlaFragment : Fragment() {
                             expandShortUrl(newUrl)
                         }
                         else {
-                            showSmallToast("Not able to find placeId. Abort.")
+                            doFail("Not able to find placeId. Abort.")
                         }
                     }
                 }
@@ -280,7 +286,18 @@ class OlaFragment : Fragment() {
                     showSmallToast("Redirect Url not supported $location")
                 }
             }
+            else {
+                doFail("Empty location in url. Abort.")
+            }
         }
+        else {
+            doFail("server error or no internet")
+        }
+    }
+
+    fun doStart() {
+        urlET.setText("[error] Processing")
+        coordinateET.setText("-,-")
     }
 
     fun doSuccess(latLong: Pair<String, String>) {
@@ -289,8 +306,15 @@ class OlaFragment : Fragment() {
         Log.d("``OlaFragment", "latitude: $lat")
         Log.d("``OlaFragment", "longitude: $long")
 
+        urlET.setText("[success] coordinates extracted")
         coordinateET.setText("$lat,$long")
-        showSmallToast("Coordinates extracted")
+        showSmallToast("[success] Coordinates extracted")
+    }
+
+    fun doFail(error: String) {
+        urlET.setText("[error] $error")
+        // coordinateET.setText("-,-")
+        showSmallToast("[fail] $error")
     }
 
     fun showSmallToast(x: String) {
